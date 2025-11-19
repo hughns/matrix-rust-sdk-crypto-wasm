@@ -1,32 +1,41 @@
 //! Types for QR code login
 
-use matrix_sdk_crypto::types::qr_login;
+use matrix_sdk_crypto::types::qr_login::{self};
 use url::Url;
 use wasm_bindgen::prelude::*;
 
 use crate::vodozemac::Curve25519PublicKey;
 
-/// The mode of the QR code login.
+/// The intent of the QR code login.
 ///
 /// The QR code login mechanism supports both, the new device, as well as the
 /// existing device to display the QR code.
 ///
-/// The different modes have an explicit one-byte identifier which gets added to
+/// The different intents have an explicit one-byte identifier which gets added to
 /// the QR code data.
 #[wasm_bindgen]
 #[derive(Debug)]
-pub enum QrCodeMode {
+pub enum QrCodeIntent {
     /// The new device is displaying the QR code.
     Login,
     /// The existing device is displaying the QR code.
     Reciprocate,
 }
 
-impl From<qr_login::QrCodeMode> for QrCodeMode {
-    fn from(value: qr_login::QrCodeMode) -> Self {
+impl From<qr_login::QrCodeIntent> for QrCodeIntent {
+    fn from(value: qr_login::QrCodeIntent) -> Self {
         match value {
-            qr_login::QrCodeMode::Login => Self::Login,
-            qr_login::QrCodeMode::Reciprocate => Self::Reciprocate,
+            qr_login::QrCodeIntent::Login => Self::Login,
+            qr_login::QrCodeIntent::Reciprocate => Self::Reciprocate,
+        }
+    }
+}
+
+impl From<QrCodeIntent> for qr_login::QrCodeIntent {
+    fn from(value: QrCodeIntent) -> Self {
+        match value {
+            QrCodeIntent::Login => Self::Login,
+            QrCodeIntent::Reciprocate => Self::Reciprocate,
         }
     }
 }
@@ -56,19 +65,17 @@ impl QrCodeData {
     #[wasm_bindgen(constructor)]
     pub fn new(
         public_key: Curve25519PublicKey,
-        rendezvous_url: &str,
-        server_name: Option<String>,
+        rendezvous_id: &str,
+        base_url: String,
+        intent: QrCodeIntent,
     ) -> Result<QrCodeData, JsError> {
         let public_key = public_key.inner;
-        let rendezvous_url = Url::parse(rendezvous_url)?;
+        let base_url = Url::parse(&base_url)?;
+        let rendezvous_id = rendezvous_id.to_owned();
 
-        let mode_data = if let Some(server_name) = server_name {
-            qr_login::QrCodeModeData::Reciprocate { server_name }
-        } else {
-            qr_login::QrCodeModeData::Login
-        };
+        let intent: qr_login::QrCodeIntent = intent.into();
 
-        let inner = qr_login::QrCodeData { public_key, rendezvous_url, mode_data };
+        let inner = qr_login::QrCodeData { public_key, rendezvous_id, base_url, intent };
 
         Ok(QrCodeData { inner })
     }
@@ -118,30 +125,22 @@ impl QrCodeData {
         self.inner.public_key.into()
     }
 
-    /// Get the URL of the rendezvous server which will be used to exchange
+    /// Get the ID of the rendezvous which will be used to exchange
     /// messages between the two devices.
-    #[wasm_bindgen(getter, js_name = "rendezvousUrl")]
-    pub fn rendezvous_url(&self) -> String {
-        self.inner.rendezvous_url.as_str().to_owned()
+    #[wasm_bindgen(getter, js_name = "rendezvousId")]
+    pub fn rendezvous_id(&self) -> String {
+        self.inner.rendezvous_id.as_str().to_owned()
     }
 
-    /// Get the server name of the homeserver which the new device will be
-    /// logged in to.
-    ///
-    /// This will be only available if the existing device has generated the QR
-    /// code and the new device is the one scanning the QR code.
-    #[wasm_bindgen(getter, js_name = "serverName")]
-    pub fn server_name(&self) -> Option<String> {
-        if let qr_login::QrCodeModeData::Reciprocate { server_name } = &self.inner.mode_data {
-            Some(server_name.to_owned())
-        } else {
-            None
-        }
+    /// Get the base URL of the homeserver hosting the rendezvous.
+    #[wasm_bindgen(getter, js_name = "baseUrl")]
+    pub fn base_url(&self) -> String {
+        self.inner.base_url.as_str().to_owned()
     }
 
-    /// Get the mode of this {@link QrCodeData} instance.
+    /// Get the mode of this {@link QrCodeIntent} instance.
     #[wasm_bindgen(getter)]
-    pub fn mode(&self) -> QrCodeMode {
-        self.inner.mode().into()
+    pub fn intent(&self) -> QrCodeIntent {
+        self.inner.intent.clone().into()
     }
 }

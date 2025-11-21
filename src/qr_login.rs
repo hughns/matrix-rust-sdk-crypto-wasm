@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::vodozemac::Curve25519PublicKey;
 
-/// The intent of the QR code login.
+/// The intent of the device that generated/displayed the QR code.
 ///
 /// The QR code login mechanism supports both, the new device, as well as the
 /// existing device to display the QR code.
